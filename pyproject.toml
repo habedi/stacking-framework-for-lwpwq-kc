@@ -27,7 +27,7 @@ pyarrow = "^14.0.1"
 tpot = "^0.12.1"
 tabulate = "^0.9.0"
 nbconvert = "^7.13.1"
-setuptools = "^69.0.3"
+setuptools = "^72.1.0"
 
 
 [build-system]
