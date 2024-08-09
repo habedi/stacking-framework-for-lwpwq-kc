@@ -1,52 +1,95 @@
-# Template for Python Projects
+# Stacking Framework
 
-[![Tests](https://github.com/habedi/template-python-project-repo/actions/workflows/tests.yml/badge.svg)](https://github.com/habedi/template-python-project-repo/actions/workflows/tests.yml)
-[![Made with Love](https://img.shields.io/badge/Made%20with-Love-red.svg)](https://github.com/habedi/template-python-project-repo)
+This repository contains the code for a stacking framework designed for
+the [Linking Writing Processes to Writing Quality](https://www.kaggle.com/competitions/linking-writing-processes-to-writing-quality)
+Kaggle competition.
 
-This repository is as a template for starting Python projects. It includes a basic structure for organizing the things like code,
-data, and notebooks, as well as a configuration file for managing the dependencies using Poetry. The repository also
-includes a GitHub Actions workflow for running tests on the codebase.
-
-I made it mainly for my personal and professional machine learning data science projects, but feel free to use it
-as a starting point for your own projects if you find it useful.
-
-## Installing Poetry
-
-We use [Poetry](https://python-poetry.org/) for managing the dependencies and virtual environment for the project. To get
-started, you need to install Poetry on your machine. We can install Poetry by running the following command in the command
-line using pip.
-
-```bash
-pip install poetry
-```
-
-When the installation is finished, run the following command in the shell in the root folder of this repository to
-install the dependencies, and create a virtual environment for the project.
-
-```bash
-poetry install
-```
-
-After that, enter the Poetry environment by invoking the poetry shell command.
-
-```bash
-poetry shell
-```
+![Framework overview](static/framework_overview.drawio.png)
 
 ## Folder Structure
 
-The repository has the following structure:
+The folder structure of the framework is as follows:
 
-- `bin/`: scripts and executables for command line use
-- `data/`: data files and datasets
-- `src/`: source code files
-- `notebooks/`: Jupyter notebooks files
-- `models/`: trained models and model files
-- `tests/`: test files for the source code
-- `pyproject.toml`: project metadata and dependencies
-- `LICENSE`: license information
-- `README.md`: project information and instructions
+- `bin`: This folder includes the binary file for [DuckDB](https://duckdb.org/).
+- `data`: This folder includes
+  the [competition data](https://www.kaggle.com/competitions/linking-writing-processes-to-writing-quality/data).
+- `src`: This folder includes the framework's source code.
 
-## License
+## Framework Layers
 
-Files in this repository are licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+The framework consists of five sequential layers, each needing the previous layer's output as input.
+
+### Layer 0
+
+The first layer includes a few Python scripts that primarily implement logging routines and define global settings for
+the framework. The names of the scripts in this layer start with `l0_`, such as `l0_settings.py`.
+
+### Layer 1
+
+The second layer consists of Python scripts that mainly implement data preprocessing, feature engineering, and simple
+feature selection routines. The names of the scripts in this layer start with `l1_`, such as `l1_filter_features.py`.
+
+### Layer 2
+
+The third layer includes the code for the base models used for stacking. Each Python file or script in this layer
+implements one base model. The names of the scripts in this layer start with `l2_`, such as `l2_base_model_xgboost.py`.
+
+### Layer 3
+
+The fourth layer includes the code for the meta-models or the stacking models. Each Python file or script in this layer
+implements one meta-model. The names of the scripts in this layer start with `l3_`, such as `l3_meta_model_xgboost.py`.
+
+### Layer 4
+
+The fifth layer includes the code for an ensemble model using simple blending. The Python script in this layer
+implements blending by computing a weighted average for the predictions of the meta-models from the previous layer. The
+name of the script(s) in this layer starts with `l4_`, such as `l4_blending_meta_models.py`.
+
+## Installing Dependencies
+
+To install the dependencies, you need to have [Poetry](https://python-poetry.org/) installed. You can install Poetry via
+Pip using the following command:
+
+`pip install poetry`
+
+To initiate the Poetry environment and install the dependency packages, run the following commands in the shell in the
+root folder of this repository after downloading it.
+
+`poetry update && poetry init`
+
+After that, enter the Poetry environment by invoking the poetry's shell using the following command:
+
+`poetry shell`
+
+## Running the Framework End-to-End ML Pipeline
+
+To run the entire framework as an end-to-end pipeline, execute the `driver_script.py`.
+
+## Important Output Files
+
+The framework generates the following two main output files after running successfully as a pipeline:
+
+- `src/submission.csv`: This is the final submission file for the competition.
+- `src/experiment_records.csv`: This file contains information about the performance of the models in the framework,
+  including the performance of the base and meta/stacking models.
+
+## Using DuckDB
+
+You can use DuckDB to work with the CSV files and see the performance of the models, which is recorded in
+the `experiment_records.csv` file. See the picture below for an example.
+
+![](static/model_performance.png)
+
+## Licenses
+
+### Data
+
+The data stored here (like the processed CSV files) are licensed
+under [Creative Commons license](http://creativecommons.org/licenses/by/4.0/).
+Please
+visit [competition's webpage](https://www.kaggle.com/competitions/linking-writing-processes-to-writing-quality/data) for
+licenses that apply to the original competition data.
+
+### Code
+
+The code in this repository is available under [Apache License](LICENSE).

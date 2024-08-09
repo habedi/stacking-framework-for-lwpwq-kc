@@ -1,0 +1,379 @@
+from l0_settings import Settings
+
+global_settings = Settings()
+
+import re
+import warnings
+
+import polars as pl
+import pandas as pd
+import numpy as np
+
+from scipy.stats import skew
+
+warnings.filterwarnings("ignore")
+
+num_cols = ['down_time', 'up_time', 'action_time', 'cursor_position', 'word_count']
+activities = ['Input', 'Remove/Cut', 'Nonproduction', 'Replace', 'Paste']
+events = ['q', 'Space', 'Backspace', 'Shift', 'ArrowRight', 'Leftclick', 'Rightclick', 'Tab', 'ArrowLeft', '.', ',',
+          'ArrowDown', 'ArrowUp', 'Enter', 'CapsLock', "'", 'Delete', 'Unidentified', 'Other']
+text_changes = ['q', ' ', '.', ',', '\n', "'", '"', '-', '?', ';', '=', '/', '\\', ':']
+useless_events = ['#', 'Alt', 'End', 'h', 't', 'o', 'I', 'b', 'Â´', 'x', '!', 'Meta', 'F15', 'm', 'Ä±', '\x80', '2',
+                  'AudioVolumeMute', 'f', '@', 'u', 'Å\x9f', 'Home', 'j', 'C', '0', 'Escape', '\x96', '^', 'l', ')',
+                  '}',
+                  'g', 'MediaTrackPrevious', 'F6', '<', '(', 'F2', 'Clear', 'S', 'Process', 'd', 'ContextMenu', 'z',
+                  '|',
+                  'Unknownclick', 'MediaPlayPause', '$', 'F', 'v', '1', 'AudioVolumeDown', 'r', 'Pause',
+                  'M', 'Insert', '>', '{', '`', 'c', '*', 'p', '\x97', 'e', 'ScrollLock', 'F1', 'AltGraph', 'F11',
+                  ']', 'V', 'T', 'Middleclick', 'Cancel', '+', '¡', 's', '[', '&', '¿', 'ä', 'y', 'i', 'ModeChange',
+                  'Ë\x86',
+                  '~', '\x9b', 'F10', 'AudioVolumeUp', 'F12', 'n', 'OS', '5', 'â\x80\x93', 'NumLock', 'Control', 'A',
+                  '_', 'PageUp', 'PageDown', 'a', '%', 'Dead', 'w', 'MediaTrackNext', 'F3']
+
+
+def count_by_values(df, colname, values):
+    fts = df.select(pl.col('id').unique(maintain_order=True))
+    for i, value in enumerate(values):
+        tmp_df = df.group_by('id').agg(pl.col(colname).is_in([value]).sum().alias(f'{colname}_{i}_cnt'))
+        fts = fts.join(tmp_df, on='id', how='left')
+    return fts
+
+
+def replace_move(x):
+    if 'move' in x.lower():
+        return 'Move'
+    else:
+        return x
+
+
+def dev_feats(df):
+    df = df.with_columns(
+        pl.col("down_event").apply(lambda x: 'Other' if x in useless_events else x).alias('down_event'))
+    df = df.with_columns(pl.col("up_event").apply(lambda x: 'Other' if x in useless_events else x).alias('up_event'))
+    df = df.with_columns(pl.col('activity').apply(lambda x: replace_move(x)).alias('activity'))
+
+    print("< Count by values features >")
+
+    feats = count_by_values(df, 'activity', activities)
+    feats = feats.join(count_by_values(df, 'text_change', text_changes), on='id', how='left')
+    feats = feats.join(count_by_values(df, 'down_event', events), on='id', how='left')
+    feats = feats.join(count_by_values(df, 'up_event', events), on='id', how='left')
+    print("< Input words stats features >")
+
+    temp = df.filter((~pl.col('text_change').str.contains('=>')) & (pl.col('text_change') != 'NoChange'))
+    temp = temp.group_by('id').agg(pl.col('text_change').str.concat('').str.extract_all(r'q+'))
+    temp = temp.with_columns(input_word_count=pl.col('text_change').list.lengths(),
+                             input_word_length_mean=pl.col('text_change').apply(
+                                 lambda x: np.mean([len(i) for i in x] if len(x) > 0 else 0)),
+                             input_word_length_max=pl.col('text_change').apply(
+                                 lambda x: np.max([len(i) for i in x] if len(x) > 0 else 0)),
+                             input_word_length_std=pl.col('text_change').apply(
+                                 lambda x: np.std([len(i) for i in x] if len(x) > 0 else 0)),
+                             input_word_length_median=pl.col('text_change').apply(
+                                 lambda x: np.median([len(i) for i in x] if len(x) > 0 else 0)),
+                             input_word_length_skew=pl.col('text_change').apply(
+                                 lambda x: skew([len(i) for i in x] if len(x) > 0 else 0)))
+    temp = temp.drop('text_change')
+    feats = feats.join(temp, on='id', how='left')
+
+    print("< Numerical columns features >")
+
+    temp = df.group_by("id").agg(pl.sum('action_time').suffix('_sum'), pl.mean(num_cols).suffix('_mean'),
+                                 pl.std(num_cols).suffix('_std'),
+                                 pl.median(num_cols).suffix('_median'), pl.min(num_cols).suffix('_min'),
+                                 pl.max(num_cols).suffix('_max'),
+                                 pl.quantile(num_cols, 0.95).suffix('_quantile95'))
+    feats = feats.join(temp, on='id', how='left')
+
+    print("< Categorical columns features >")
+
+    temp = df.group_by("id").agg(pl.n_unique(['activity', 'down_event', 'up_event', 'text_change']))
+    feats = feats.join(temp, on='id', how='left')
+
+    print("< Idle time features >")
+
+    temp = df.with_columns(pl.col('up_time').shift().over('id').alias('up_time_lagged'))
+    temp = temp.with_columns(
+        (abs(pl.col('down_time') - pl.col('up_time_lagged')) / 1000).fill_null(0).alias('time_diff'))
+    temp = temp.filter(pl.col('activity').is_in(['Input', 'Remove/Cut']))
+    temp = temp.group_by("id").agg(inter_key_largest_lantency=pl.max('time_diff'),
+                                   inter_key_median_lantency=pl.median('time_diff'),
+                                   mean_pause_time=pl.mean('time_diff'),
+                                   std_pause_time=pl.std('time_diff'),
+                                   total_pause_time=pl.sum('time_diff'),
+                                   pauses_half_sec=pl.col('time_diff').filter(
+                                       (pl.col('time_diff') > 0.5) & (pl.col('time_diff') < 1)).count(),
+                                   pauses_1_sec=pl.col('time_diff').filter(
+                                       (pl.col('time_diff') > 1) & (pl.col('time_diff') < 1.5)).count(),
+                                   pauses_1_half_sec=pl.col('time_diff').filter(
+                                       (pl.col('time_diff') > 1.5) & (pl.col('time_diff') < 2)).count(),
+                                   pauses_2_sec=pl.col('time_diff').filter(
+                                       (pl.col('time_diff') > 2) & (pl.col('time_diff') < 3)).count(),
+                                   pauses_3_sec=pl.col('time_diff').filter(pl.col('time_diff') > 3).count(), )
+    feats = feats.join(temp, on='id', how='left')
+
+    print("< P-bursts features >")
+
+    temp = df.with_columns(pl.col('up_time').shift().over('id').alias('up_time_lagged'))
+    temp = temp.with_columns(
+        (abs(pl.col('down_time') - pl.col('up_time_lagged')) / 1000).fill_null(0).alias('time_diff'))
+    temp = temp.filter(pl.col('activity').is_in(['Input', 'Remove/Cut']))
+    temp = temp.with_columns(pl.col('time_diff') < 2)
+    temp = temp.with_columns(pl.when(pl.col("time_diff") & pl.col("time_diff").is_last()).then(pl.count()).over(
+        pl.col("time_diff").rle_id()).alias('P-bursts'))
+    temp = temp.drop_nulls()
+    temp = temp.group_by("id").agg(pl.mean('P-bursts').suffix('_mean'), pl.std('P-bursts').suffix('_std'),
+                                   pl.count('P-bursts').suffix('_count'),
+                                   pl.median('P-bursts').suffix('_median'), pl.max('P-bursts').suffix('_max'),
+                                   pl.first('P-bursts').suffix('_first'), pl.last('P-bursts').suffix('_last'))
+    feats = feats.join(temp, on='id', how='left')
+
+    print("< R-bursts features >")
+
+    temp = df.filter(pl.col('activity').is_in(['Input', 'Remove/Cut']))
+    temp = temp.with_columns(pl.col('activity').is_in(['Remove/Cut']))
+    temp = temp.with_columns(pl.when(pl.col("activity") & pl.col("activity").is_last()).then(pl.count()).over(
+        pl.col("activity").rle_id()).alias('R-bursts'))
+    temp = temp.drop_nulls()
+    temp = temp.group_by("id").agg(pl.mean('R-bursts').suffix('_mean'), pl.std('R-bursts').suffix('_std'),
+                                   pl.median('R-bursts').suffix('_median'), pl.max('R-bursts').suffix('_max'),
+                                   pl.first('R-bursts').suffix('_first'), pl.last('R-bursts').suffix('_last'))
+    feats = feats.join(temp, on='id', how='left')
+
+    return feats
+
+
+def train_valid_split(data_x, data_y, train_idx, valid_idx):
+    x_train = data_x.iloc[train_idx]
+    y_train = data_y[train_idx]
+    x_valid = data_x.iloc[valid_idx]
+    y_valid = data_y[valid_idx]
+    return x_train, y_train, x_valid, y_valid
+
+
+def q25(x):
+    return x.quantile(0.25)
+
+
+def q75(x):
+    return x.quantile(0.75)
+
+
+def q95(x):
+    return x.quantile(0.95)
+
+
+def q05(x):
+    return x.quantile(0.05)
+
+
+AGGREGATIONS = ['count', 'mean', 'min', 'max', 'first', 'last', q05, q25, 'median', q75, q95, 'sum']
+
+
+def reconstruct_essay(currTextInput):
+    essayText = ""
+    for Input in currTextInput.values:
+        if Input[0] == 'Replace':
+            replaceTxt = Input[2].split(' => ')
+            essayText = essayText[:Input[1] - len(replaceTxt[1])] + replaceTxt[1] + essayText[
+                                                                                    Input[1] - len(replaceTxt[1]) + len(
+                                                                                        replaceTxt[0]):]
+            continue
+        if Input[0] == 'Paste':
+            essayText = essayText[:Input[1] - len(Input[2])] + Input[2] + essayText[Input[1] - len(Input[2]):]
+            continue
+        if Input[0] == 'Remove/Cut':
+            essayText = essayText[:Input[1]] + essayText[Input[1] + len(Input[2]):]
+            continue
+        if "M" in Input[0]:
+            croppedTxt = Input[0][10:]
+            splitTxt = croppedTxt.split(' To ')
+            valueArr = [item.split(', ') for item in splitTxt]
+            moveData = (
+                int(valueArr[0][0][1:]), int(valueArr[0][1][:-1]), int(valueArr[1][0][1:]), int(valueArr[1][1][:-1]))
+            if moveData[0] != moveData[2]:
+                if moveData[0] < moveData[2]:
+                    essayText = essayText[:moveData[0]] + essayText[moveData[1]:moveData[3]] + essayText[
+                                                                                               moveData[0]:moveData[
+                                                                                                   1]] + essayText[
+                                                                                                         moveData[3]:]
+                else:
+                    essayText = essayText[:moveData[2]] + essayText[moveData[0]:moveData[1]] + essayText[
+                                                                                               moveData[2]:moveData[
+                                                                                                   0]] + essayText[
+                                                                                                         moveData[1]:]
+            continue
+        essayText = essayText[:Input[1] - len(Input[2])] + Input[2] + essayText[Input[1] - len(Input[2]):]
+    return essayText
+
+
+def get_essay_df(df):
+    df = df[df.activity != 'Nonproduction']
+    temp = df.groupby('id').apply(lambda x: reconstruct_essay(x[['activity', 'cursor_position', 'text_change']]))
+    essay_df = pd.DataFrame({'id': df['id'].unique().tolist()})
+    essay_df = essay_df.merge(temp.rename('essay'), on='id')
+    return essay_df
+
+
+def word_feats(df):
+    essay_df = df
+    df['word'] = df['essay'].apply(lambda x: re.split(' |\\n|\\.|\\?|\\!', x))
+    df = df.explode('word')
+    df['word_len'] = df['word'].apply(lambda x: len(x))
+    df = df[df['word_len'] != 0]
+
+    word_agg_df = df[['id', 'word_len']].groupby(['id']).agg(AGGREGATIONS)
+    word_agg_df.columns = ['_'.join(x) for x in word_agg_df.columns]
+    word_agg_df['id'] = word_agg_df.index
+    word_agg_df = word_agg_df.reset_index(drop=True)
+    return word_agg_df
+
+
+def sent_feats(df):
+    df['sent'] = df['essay'].apply(lambda x: re.split('\\.|\\?|\\!', x))
+    df = df.explode('sent')
+    df['sent'] = df['sent'].apply(lambda x: x.replace('\n', '').strip())
+    # Number of characters in sentences
+    df['sent_len'] = df['sent'].apply(lambda x: len(x))
+    # Number of words in sentences
+    df['sent_word_count'] = df['sent'].apply(lambda x: len(x.split(' ')))
+    df = df[df.sent_len != 0].reset_index(drop=True)
+
+    sent_agg_df = pd.concat([df[['id', 'sent_len']].groupby(['id']).agg(AGGREGATIONS),
+                             df[['id', 'sent_word_count']].groupby(['id']).agg(AGGREGATIONS)], axis=1)
+    sent_agg_df.columns = ['_'.join(x) for x in sent_agg_df.columns]
+    sent_agg_df['id'] = sent_agg_df.index
+    sent_agg_df = sent_agg_df.reset_index(drop=True)
+    sent_agg_df.drop(columns=["sent_word_count_count"], inplace=True)
+    sent_agg_df = sent_agg_df.rename(columns={"sent_len_count": "sent_count"})
+    return sent_agg_df
+
+
+def parag_feats(df):
+    df['paragraph'] = df['essay'].apply(lambda x: x.split('\n'))
+    df = df.explode('paragraph')
+    # Number of characters in paragraphs
+    df['paragraph_len'] = df['paragraph'].apply(lambda x: len(x))
+    # Number of words in paragraphs
+    df['paragraph_word_count'] = df['paragraph'].apply(lambda x: len(x.split(' ')))
+    df = df[df.paragraph_len != 0].reset_index(drop=True)
+
+    paragraph_agg_df = pd.concat([df[['id', 'paragraph_len']].groupby(['id']).agg(AGGREGATIONS),
+                                  df[['id', 'paragraph_word_count']].groupby(['id']).agg(AGGREGATIONS)], axis=1)
+    paragraph_agg_df.columns = ['_'.join(x) for x in paragraph_agg_df.columns]
+    paragraph_agg_df['id'] = paragraph_agg_df.index
+    paragraph_agg_df = paragraph_agg_df.reset_index(drop=True)
+    paragraph_agg_df.drop(columns=["paragraph_word_count_count"], inplace=True)
+    paragraph_agg_df = paragraph_agg_df.rename(columns={"paragraph_len_count": "paragraph_count"})
+    return paragraph_agg_df
+
+
+def product_to_keys(logs, essays):
+    essays['product_len'] = essays.essay.str.len()
+    tmp_df = logs[logs.activity.isin(['Input', 'Remove/Cut'])].groupby(['id']).agg(
+        {'activity': 'count'}).reset_index().rename(columns={'activity': 'keys_pressed'})
+    essays = essays.merge(tmp_df, on='id', how='left')
+    essays['product_to_keys'] = essays['product_len'] / essays['keys_pressed']
+    return essays[['id', 'product_to_keys']]
+
+
+def get_keys_pressed_per_second(logs):
+    temp_df = logs[logs['activity'].isin(['Input', 'Remove/Cut'])].groupby(['id']).agg(
+        keys_pressed=('event_id', 'count')).reset_index()
+    temp_df_2 = logs.groupby(['id']).agg(min_down_time=('down_time', 'min'),
+                                         max_up_time=('up_time', 'max')).reset_index()
+    temp_df = temp_df.merge(temp_df_2, on='id', how='left')
+    temp_df['keys_per_second'] = temp_df['keys_pressed'] / ((temp_df['max_up_time'] - temp_df['min_down_time']) / 1000)
+    return temp_df[['id', 'keys_per_second']]
+
+
+def word_hist_feats(text):
+    # Dictionary to store counts of punctuation marks
+    punctuation_counts = {
+        'wlc_13': text.count('.'),
+        'wlc_14': text.count(','),
+        'wlc_15': text.count('!'),
+        'wlc_16': text.count('?'),
+        'wlc_17': text.count('\n'),
+        'wlc_18': text.count(';'),
+        'wlc_19': text.count(':'),
+        'wlc_20': text.count("'") + text.count('"')
+    }
+
+    # Clean the text and split into words
+    for char in ['\n', '.', ',', '?', '!', ';', ':', '-', "'"]:
+        text = text.replace(char, ' ')
+    words = [word for word in text.split(' ') if word]
+
+    # Length of words in cleaned text
+    word_lengths = [len(word.strip()) for word in words]
+
+    # Count occurrences of each word length
+    word_length_counts = {f"wlc_{i}": word_lengths.count(i) for i in range(1, 13)}
+
+    # Combine the two dictionaries
+    return pd.Series({**word_length_counts, **punctuation_counts})
+
+
+data_path = global_settings.data_dir
+train_logs = pl.scan_csv(data_path / 'train_logs.csv.gz', )  # n_rows=int(3e5))
+train_feats = dev_feats(train_logs)
+train_feats = train_feats.collect().to_pandas()
+
+print('< Essay Reconstruction >')
+train_logs = train_logs.collect().to_pandas()
+train_essays = get_essay_df(train_logs)
+word_hist_features_train = pd.concat([train_essays[['id']], train_essays['essay'].apply(lambda x: word_hist_feats(x))],
+                                     axis=1)
+train_feats = train_feats.merge(word_feats(train_essays), on='id', how='left')
+train_feats = train_feats.merge(sent_feats(train_essays), on='id', how='left')
+train_feats = train_feats.merge(parag_feats(train_essays), on='id', how='left')
+train_feats = train_feats.merge(get_keys_pressed_per_second(train_logs), on='id', how='left')
+train_feats = train_feats.merge(product_to_keys(train_logs, train_essays), on='id', how='left')
+train_feats = train_feats.merge(word_hist_features_train, on='id', how='left')
+
+print('< Mapping >')
+train_scores = pd.read_csv(data_path / 'train_scores.csv.gz')
+data = train_feats.merge(train_scores, on='id', how='left')
+x = data.drop(['id', 'score'], axis=1)
+y = data['score'].values
+print(f'Number of features: {len(x.columns)}')
+
+print('< Testing Data >')
+test_logs = pl.scan_csv(data_path / 'test_logs.csv.gz')
+test_feats = dev_feats(test_logs)
+test_feats = test_feats.collect().to_pandas()
+
+test_logs = test_logs.collect().to_pandas()
+test_essays = get_essay_df(test_logs)
+word_hist_features_test = pd.concat([test_essays[['id']], test_essays['essay'].apply(lambda x: word_hist_feats(x))],
+                                    axis=1)
+test_feats = test_feats.merge(word_feats(test_essays), on='id', how='left')
+test_feats = test_feats.merge(sent_feats(test_essays), on='id', how='left')
+test_feats = test_feats.merge(parag_feats(test_essays), on='id', how='left')
+test_feats = test_feats.merge(get_keys_pressed_per_second(test_logs), on='id', how='left')
+test_feats = test_feats.merge(product_to_keys(test_logs, test_essays), on='id', how='left')
+test_feats = test_feats.merge(word_hist_features_test, on='id', how='left')
+
+test_ids = test_feats['id'].values
+testin_x = test_feats.drop(['id'], axis=1)
+
+print(f'Number of features: {len(testin_x.columns)}')
+
+print('Writing to csv the raw features in the output directory')
+
+# Create output directory if it doesn't exist
+global_settings.raw_features_dir.mkdir(parents=True, exist_ok=True)
+
+train_feats_with_scores = train_feats.merge(train_scores, on=global_settings.id_col, how='left')
+
+# replace inf with nan
+train_feats_with_scores.replace([np.inf, -np.inf], np.nan, inplace=True)
+test_feats.replace([np.inf, -np.inf], np.nan, inplace=True)
+
+# Write to csv files
+train_feats_with_scores.to_csv(global_settings.raw_features_dir / 'raw_train_features_with_scores_v3.csv.gz',
+                               index=False)
+test_feats.to_csv(global_settings.raw_features_dir / 'raw_test_features_v3.csv.gz', index=False)
+
+print('Done!')

@@ -1,0 +1,40 @@
+<mxfile host="app.diagrams.net" modified="2024-01-03T07:08:52.709Z" agent="Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/115.0" etag="0vQlGVYoWfG96dswCdwq" version="22.1.16" type="device">
+  <diagram name="Page-1" id="8deO2fdtg1eLa12OaUWC">
+    <mxGraphModel dx="2284" dy="748" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="HfkBl8uibeEBnU8sCYMU-1" value="&lt;div style=&quot;font-size: 13px;&quot;&gt;Layer 0&lt;/div&gt;&lt;div style=&quot;font-size: 13px;&quot;&gt;Logging, global settings, utilities, etc. &lt;br style=&quot;font-size: 13px;&quot;&gt;&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffff88;strokeColor=#36393d;strokeWidth=2;shadow=1;sketch=1;curveFitting=1;jiggle=2;spacingTop=2;spacing=3;fontSize=13;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="90" y="310" width="590" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="HfkBl8uibeEBnU8sCYMU-2" value="&lt;div style=&quot;font-size: 13px;&quot;&gt;Layer 1&lt;br style=&quot;font-size: 13px;&quot;&gt;&lt;/div&gt;&lt;div style=&quot;font-size: 13px;&quot;&gt;&lt;br style=&quot;font-size: 13px;&quot;&gt;&lt;/div&gt;&lt;div style=&quot;font-size: 13px;&quot;&gt;Data preprocessing,&lt;/div&gt;&lt;div style=&quot;font-size: 13px;&quot;&gt;feature engineering, feature selection&lt;br style=&quot;font-size: 13px;&quot;&gt;&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;direction=west;fillColor=#eeeeee;strokeColor=#36393d;strokeWidth=2;shadow=1;sketch=1;curveFitting=1;jiggle=2;spacingTop=2;spacing=3;fontSize=13;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="100" y="120" width="150" height="160" as="geometry" />
+        </mxCell>
+        <mxCell id="HfkBl8uibeEBnU8sCYMU-3" value="&lt;div style=&quot;font-size: 13px;&quot;&gt;Layer 2&lt;/div&gt;&lt;div style=&quot;font-size: 13px;&quot;&gt;&lt;br style=&quot;font-size: 13px;&quot;&gt;&lt;/div&gt;&lt;div style=&quot;font-size: 13px;&quot;&gt;Base models&lt;br style=&quot;font-size: 13px;&quot;&gt;&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f9f7ed;strokeColor=#36393d;strokeWidth=2;shadow=1;sketch=1;curveFitting=1;jiggle=2;spacingTop=2;spacing=3;fontSize=13;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="270" y="120" width="100" height="160" as="geometry" />
+        </mxCell>
+        <mxCell id="HfkBl8uibeEBnU8sCYMU-4" value="&lt;div style=&quot;font-size: 13px;&quot;&gt;Layer 3&lt;/div&gt;&lt;div style=&quot;font-size: 13px;&quot;&gt;&lt;br style=&quot;font-size: 13px;&quot;&gt;&lt;/div&gt;&lt;div style=&quot;font-size: 13px;&quot;&gt;Meta-models (or stacking models)&lt;br style=&quot;font-size: 13px;&quot;&gt;&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffcc99;strokeColor=#36393d;strokeWidth=2;shadow=1;sketch=1;curveFitting=1;jiggle=2;spacingTop=2;spacing=3;fontSize=13;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="390" y="120" width="120" height="160" as="geometry" />
+        </mxCell>
+        <mxCell id="HfkBl8uibeEBnU8sCYMU-5" value="&lt;div style=&quot;font-size: 13px;&quot;&gt;Layer 4&lt;/div&gt;&lt;div style=&quot;font-size: 13px;&quot;&gt;&lt;br style=&quot;font-size: 13px;&quot;&gt;&lt;/div&gt;&lt;div style=&quot;font-size: 13px;&quot;&gt;Final (meta-) model&lt;br style=&quot;font-size: 13px;&quot;&gt;&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffcccc;strokeColor=#36393d;strokeWidth=2;shadow=1;sketch=1;curveFitting=1;jiggle=2;spacingTop=2;spacing=3;fontSize=13;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="530" y="120" width="140" height="160" as="geometry" />
+        </mxCell>
+        <mxCell id="HfkBl8uibeEBnU8sCYMU-6" value="&lt;div&gt;Raw train and&lt;/div&gt;&lt;div&gt;test data&lt;/div&gt;" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#cce5ff;strokeColor=#36393d;strokeWidth=2;shadow=1;sketch=1;curveFitting=1;jiggle=2;spacingTop=2;spacing=3;fontSize=13;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="-90" y="175" width="130" height="165" as="geometry" />
+        </mxCell>
+        <mxCell id="HfkBl8uibeEBnU8sCYMU-8" value="Predictions" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#cdeb8b;strokeColor=#36393d;strokeWidth=2;shadow=1;sketch=1;curveFitting=1;jiggle=2;spacingTop=2;spacing=3;fontSize=13;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="720" y="180" width="80" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="HfkBl8uibeEBnU8sCYMU-9" value="" style="shape=flexArrow;endArrow=classic;html=1;rounded=0;fillColor=#cce5ff;strokeColor=#36393d;sketch=1;curveFitting=1;jiggle=2;shadow=1;spacingTop=2;spacing=3;fontSize=13;fontStyle=1" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="40" y="60" as="sourcePoint" />
+            <mxPoint x="720" y="60" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="HfkBl8uibeEBnU8sCYMU-14" value="Flow" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;sketch=1;curveFitting=1;jiggle=2;shadow=1;spacingTop=2;spacing=3;fontSize=13;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="310" y="10" width="60" height="30" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

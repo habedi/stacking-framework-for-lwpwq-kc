@@ -36,3 +36,6 @@
 *.pkl filter=lfs diff=lfs merge=lfs -text
 *.pickle filter=lfs diff=lfs merge=lfs -text
 *.npy filter=lfs diff=lfs merge=lfs -text
+
+# Additional file formats and names
+duckdb filter=lfs diff=lfs merge=lfs -text
